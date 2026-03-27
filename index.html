@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<!-- 2026-03-27 pds  initial prototype — fridge poetry, no ice maker -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RISC-V Fridge — Instruction Poetry</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+:root {
+  --bg:    #0d0d0d;
+  --bg2:   #111;
+  --dim:   #555;
+  --text:  #ddd;
+  --rule:  #2a2a2a;
+  --yellow:#ffe000;
+  --green: #00ff88;
+  --cyan:  #00cfff;
+}
+html, body {
+  background: var(--bg); color: var(--text);
+  font-family: 'Courier New', monospace;
+  min-height: 100vh;
+}
+body { display: flex; flex-direction: column; align-items: center; padding: 12px 10px 60px; }
+
+#masthead {
+  text-align: center; margin-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 10px; width: 100%; max-width: 860px;
+}
+#masthead h1 { font-size: clamp(0.9em,3vw,1.3em); color: var(--yellow); letter-spacing: 2px; }
+#masthead .sub { font-size: 0.62em; color: var(--dim); letter-spacing: 2px; margin-top: 4px; }
+
+#tray {
+  display: flex; flex-wrap: wrap; gap: 5px;
+  padding: 8px; background: #111;
+  border: 0.5px solid var(--rule);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  width: 100%; max-width: 860px;
+  min-height: 44px;
+}
+
+.tray-tile {
+  font-size: 13px; font-weight: 700;
+  padding: 4px 9px; border-radius: 5px;
+  border: 2px solid rgba(0,0,0,0.2);
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.3);
+  cursor: grab; white-space: nowrap;
+  transition: transform 0.08s;
+}
+.tray-tile:hover { transform: scale(1.1) rotate(-1deg); }
+
+#controls {
+  display: flex; gap: 6px; margin-bottom: 6px;
+  width: 100%; max-width: 860px;
+}
+button {
+  font-size: 11px; padding: 4px 10px;
+  border: 0.5px solid #444; border-radius: 4px;
+  background: #111; color: var(--dim);
+  cursor: pointer; font-family: 'Courier New', monospace;
+  letter-spacing: 1px;
+}
+button:hover { color: var(--yellow); border-color: var(--yellow); }
+
+#fridge {
+  width: 100%; max-width: 860px;
+  background: #c8d4dc;
+  background-image: radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.2) 0%, transparent 60%);
+  border-radius: 10px;
+  border: 4px solid #9aaab4;
+  border-bottom: 8px solid #8899a4;
+  min-height: 380px;
+  position: relative;
+  overflow: hidden;
+}
+
+.fmag {
+  position: absolute;
+  font-size: 15px; font-weight: 700;
+  padding: 5px 11px; border-radius: 5px;
+  border: 2px solid rgba(0,0,0,0.2);
+  box-shadow: 2px 3px 0 rgba(0,0,0,0.25);
+  cursor: grab; white-space: nowrap;
+  transition: box-shadow 0.08s;
+}
+.fmag:active { cursor: grabbing; box-shadow: 4px 6px 0 rgba(0,0,0,0.3); transform: rotate(-1.5deg) scale(1.06); }
+
+/* field colors */
+.m-opcode { background:#3C3489; color:#EEEDFE; border-color:#26215C; }
+.m-rd     { background:#0F6E56; color:#E1F5EE; border-color:#085041; }
+.m-rs1    { background:#0C447C; color:#E6F1FB; border-color:#042C53; }
+.m-rs2    { background:#993C1D; color:#FAECE7; border-color:#4A1B0C; }
+.m-funct3 { background:#854F0B; color:#FAEEDA; border-color:#412402; }
+.m-funct7 { background:#3B6D11; color:#EAF3DE; border-color:#173404; }
+.m-imm    { background:#993556; color:#FBEAF0; border-color:#4B1528; }
+.m-pseudo { background:#1D9E75; color:#E1F5EE; border-color:#04342C; }
+.m-reg    { background:#178ADE; color:#E6F1FB; border-color:#042C53; }
+.m-label  { background:#5F5E5A; color:#F1EFE8; border-color:#2C2C2A; }
+
+#decode-out {
+  font-size: 12px; font-family: 'Courier New', monospace;
+  color: var(--text);
+  background: #111; border: 0.5px solid var(--rule);
+  border-radius: 4px; padding: 7px 10px;
+  min-height: 32px; margin-top: 6px;
+  width: 100%; max-width: 860px;
+}
+
+#legend {
+  display: flex; flex-wrap: wrap; gap: 5px;
+  margin-top: 8px; width: 100%; max-width: 860px;
+}
+.leg { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--dim); }
+.leg-dot { width: 9px; height: 9px; border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div id="masthead">
+  <h1>RISC&#8209;V FRIDGE &mdash; NO ICE MAKER</h1>
+  <div class="sub">INSTRUCTION FIELD POETRY &mdash; DRAG FREELY &mdash; DECODE ANYTHING</div>
+</div>
+
+<div id="tray"></div>
+
+<div id="controls">
+  <button onclick="scatter()">scatter</button>
+  <button onclick="clearFridge()">clear</button>
+  <button onclick="decode()" style="color:var(--green);border-color:var(--green);">decode &#9658;</button>
+</div>
+
+<div id="fridge"></div>
+<div id="decode-out">drag tiles onto the fridge &mdash; arrange freely &mdash; then decode</div>
+
+<div id="legend">
+  <div class="leg"><div class="leg-dot" style="background:#3C3489"></div>opcode</div>
+  <div class="leg"><div class="leg-dot" style="background:#0F6E56"></div>rd</div>
+  <div class="leg"><div class="leg-dot" style="background:#0C447C"></div>rs1</div>
+  <div class="leg"><div class="leg-dot" style="background:#993C1D"></div>rs2</div>
+  <div class="leg"><div class="leg-dot" style="background:#854F0B"></div>funct3</div>
+  <div class="leg"><div class="leg-dot" style="background:#993556"></div>imm</div>
+  <div class="leg"><div class="leg-dot" style="background:#1D9E75"></div>pseudo</div>
+  <div class="leg"><div class="leg-dot" style="background:#178ADE"></div>register</div>
+</div>
+
+<script>
+/*
+ * RISC-V Fridge — No Ice Maker
+ * 2026-03-27 pds/claude  initial prototype
+ * Free-form instruction field poetry. No constraints.
+ * Drag tiles, arrange, decode to find out what you built.
+ */
+
+var TILES = [
+  {cls:'m-opcode',v:'ADD'},{cls:'m-opcode',v:'SUB'},{cls:'m-opcode',v:'AND'},
+  {cls:'m-opcode',v:'OR'}, {cls:'m-opcode',v:'XOR'},{cls:'m-opcode',v:'SLL'},
+  {cls:'m-opcode',v:'SRL'},{cls:'m-opcode',v:'LW'}, {cls:'m-opcode',v:'SW'},
+  {cls:'m-opcode',v:'BEQ'},{cls:'m-opcode',v:'BNE'},{cls:'m-opcode',v:'BLT'},
+  {cls:'m-opcode',v:'BGE'},{cls:'m-opcode',v:'JAL'},{cls:'m-opcode',v:'JALR'},
+  {cls:'m-opcode',v:'LUI'},{cls:'m-opcode',v:'AUIPC'},{cls:'m-opcode',v:'ADDI'},
+  {cls:'m-rd',v:'x0'},{cls:'m-rd',v:'x1'},{cls:'m-rd',v:'x10'},
+  {cls:'m-rs1',v:'x2'},{cls:'m-rs1',v:'x5'},{cls:'m-rs1',v:'x11'},
+  {cls:'m-rs2',v:'x6'},{cls:'m-rs2',v:'x12'},{cls:'m-rs2',v:'x7'},
+  {cls:'m-reg',v:'zero'},{cls:'m-reg',v:'ra'},{cls:'m-reg',v:'sp'},
+  {cls:'m-reg',v:'a0'},{cls:'m-reg',v:'a1'},{cls:'m-reg',v:'t0'},
+  {cls:'m-reg',v:'s0'},{cls:'m-reg',v:'gp'},{cls:'m-reg',v:'tp'},
+  {cls:'m-imm',v:'0'},{cls:'m-imm',v:'1'},{cls:'m-imm',v:'4'},
+  {cls:'m-imm',v:'-1'},{cls:'m-imm',v:'8'},{cls:'m-imm',v:'42'},
+  {cls:'m-imm',v:'0xFF'},{cls:'m-imm',v:'-4'},{cls:'m-imm',v:'100'},
+  {cls:'m-funct3',v:'000'},{cls:'m-funct3',v:'010'},{cls:'m-funct3',v:'110'},
+  {cls:'m-pseudo',v:'li'},{cls:'m-pseudo',v:'mv'},{cls:'m-pseudo',v:'nop'},
+  {cls:'m-pseudo',v:'ret'},{cls:'m-pseudo',v:'call'},{cls:'m-pseudo',v:'j'},
+  {cls:'m-pseudo',v:'beqz'},{cls:'m-pseudo',v:'bnez'},{cls:'m-pseudo',v:'la'},
+  {cls:'m-label',v:'.loop'},{cls:'m-label',v:'.done'},{cls:'m-label',v:'main'},
+];
+
+var PSEUDOS = ['li','mv','nop','ret','call','j','jr','la','beqz','bnez','tail'];
+var OPCODES = ['ADD','SUB','AND','OR','XOR','SLL','SRL','SRA','LW','LH','LB',
+               'SW','SH','SB','BEQ','BNE','BLT','BGE','JAL','JALR','LUI',
+               'AUIPC','ADDI','SLTI','ANDI','ORI','XORI'];
+var EXPANDS = {
+  li:'addi rd, x0, imm', mv:'add rd, rs, x0',
+  nop:'addi x0, x0, 0', ret:'jalr x0, x1, 0',
+  j:'jal x0, offset', beqz:'beq rs, x0, offset',
+  bnez:'bne rs, x0, offset', call:'auipc+jalr rd, offset',
+  tail:'auipc+jalr x0, offset'
+};
+
+var dragEl = null, offX = 0, offY = 0;
+
+function classToType(cls) {
+  if (cls.includes('m-opcode')) return 'opcode';
+  if (cls.includes('m-rd'))     return 'rd';
+  if (cls.includes('m-rs1'))    return 'rs1';
+  if (cls.includes('m-rs2'))    return 'rs2';
+  if (cls.includes('m-imm'))    return 'imm';
+  if (cls.includes('m-funct3')) return 'funct3';
+  if (cls.includes('m-pseudo')) return 'pseudo';
+  if (cls.includes('m-reg'))    return 'reg';
+  if (cls.includes('m-label'))  return 'label';
+  return 'x';
+}
+
+function buildTray() {
+  var tray = document.getElementById('tray');
+  TILES.forEach(function(t) {
+    var el = document.createElement('div');
+    el.className = 'tray-tile ' + t.cls;
+    el.textContent = t.v;
+    el.dataset.val = t.v;
+    el.dataset.cls = t.cls;
+    el.addEventListener('mousedown', function(e) { spawnFromTray(t.cls, t.v, e.clientX, e.clientY); e.preventDefault(); });
+    el.addEventListener('touchstart', function(e) { var tc=e.touches[0]; spawnFromTray(t.cls, t.v, tc.clientX, tc.clientY); e.preventDefault(); }, {passive:false});
+    tray.appendChild(el);
+  });
+}
+
+function spawnFromTray(cls, val, cx, cy) {
+  var fridge = document.getElementById('fridge');
+  var fr = fridge.getBoundingClientRect();
+  var el = document.createElement('div');
+  el.className = 'fmag ' + cls;
+  el.textContent = val;
+  el.dataset.val = val;
+  el.dataset.cls = cls;
+  var x = Math.max(0, cx - fr.left - 30);
+  var y = Math.max(0, cy - fr.top - 15);
+  el.style.left = x + 'px';
+  el.style.top  = y + 'px';
+  el.addEventListener('mousedown', startDrag);
+  el.addEventListener('touchstart', startDragTouch, {passive:false});
+  fridge.appendChild(el);
+  dragEl = el; offX = 30; offY = 15;
+}
+
+function startDrag(e) {
+  dragEl = e.currentTarget;
+  var rect = dragEl.getBoundingClientRect();
+  offX = e.clientX - rect.left;
+  offY = e.clientY - rect.top;
+  dragEl.style.zIndex = 999;
+  e.preventDefault(); e.stopPropagation();
+}
+function startDragTouch(e) {
+  dragEl = e.currentTarget;
+  var t = e.touches[0];
+  var rect = dragEl.getBoundingClientRect();
+  offX = t.clientX - rect.left;
+  offY = t.clientY - rect.top;
+  dragEl.style.zIndex = 999;
+  e.preventDefault(); e.stopPropagation();
+}
+document.addEventListener('mousemove', function(e) {
+  if (!dragEl) return;
+  var fr = document.getElementById('fridge').getBoundingClientRect();
+  var nx = Math.max(0, Math.min(fr.width  - dragEl.offsetWidth,  e.clientX - fr.left - offX));
+  var ny = Math.max(0, Math.min(fr.height - dragEl.offsetHeight, e.clientY - fr.top  - offY));
+  dragEl.style.left = nx + 'px'; dragEl.style.top = ny + 'px';
+});
+document.addEventListener('touchmove', function(e) {
+  if (!dragEl) return;
+  var t = e.touches[0];
+  var fr = document.getElementById('fridge').getBoundingClientRect();
+  var nx = Math.max(0, Math.min(fr.width  - dragEl.offsetWidth,  t.clientX - fr.left - offX));
+  var ny = Math.max(0, Math.min(fr.height - dragEl.offsetHeight, t.clientY - fr.top  - offY));
+  dragEl.style.left = nx + 'px'; dragEl.style.top = ny + 'px';
+  e.preventDefault();
+}, {passive:false});
+document.addEventListener('mouseup',  function() { if (dragEl) { dragEl.style.zIndex = ''; dragEl = null; } });
+document.addEventListener('touchend', function() { if (dragEl) { dragEl.style.zIndex = ''; dragEl = null; } });
+
+function scatter() {
+  var fridge = document.getElementById('fridge');
+  fridge.querySelectorAll('.fmag').forEach(function(m) { m.remove(); });
+  var pick = TILES.slice().sort(function(){return Math.random()-0.5;}).slice(0,14);
+  var fw = fridge.offsetWidth || 400;
+  var fh = fridge.offsetHeight || 380;
+  pick.forEach(function(t) {
+    var el = document.createElement('div');
+    el.className = 'fmag ' + t.cls;
+    el.textContent = t.v;
+    el.dataset.val = t.v;
+    el.dataset.cls = t.cls;
+    el.style.left = (20 + Math.random()*(fw-120)) + 'px';
+    el.style.top  = (20 + Math.random()*(fh-80))  + 'px';
+    el.style.transform = 'rotate(' + ((Math.random()-0.5)*12) + 'deg)';
+    el.addEventListener('mousedown', startDrag);
+    el.addEventListener('touchstart', startDragTouch, {passive:false});
+    fridge.appendChild(el);
+  });
+  document.getElementById('decode-out').textContent = 'drag tiles, arrange freely, then decode';
+}
+
+function clearFridge() {
+  document.getElementById('fridge').querySelectorAll('.fmag').forEach(function(m){m.remove();});
+  document.getElementById('decode-out').textContent = 'drag tiles onto the fridge \u2014 arrange freely \u2014 then decode';
+}
+
+function decode() {
+  var fridge = document.getElementById('fridge');
+  var mags = Array.from(fridge.querySelectorAll('.fmag'))
+    .sort(function(a,b){ return parseInt(a.style.left) - parseInt(b.style.left); });
+  if (mags.length === 0) { document.getElementById('decode-out').textContent = 'nothing on the fridge.'; return; }
+  var vals = mags.map(function(m){ return m.dataset.val; });
+  var poetry = vals.join('  ');
+  var result = '';
+  if (PSEUDOS.indexOf(vals[0]) !== -1) {
+    result = 'pseudo-instruction: ' + poetry;
+    if (EXPANDS[vals[0]]) result += '\nexpands to: ' + EXPANDS[vals[0]];
+  } else if (OPCODES.indexOf(vals[0]) !== -1) {
+    result = 'real instruction: ' + poetry;
+  } else {
+    result = '\u201c' + poetry + '\u201d\n\u2026not a known instruction. pure poetry.';
+  }
+  document.getElementById('decode-out').textContent = result;
+}
+
+buildTray();
+scatter();
+</script>
+</body>
+</html>
