@@ -2,7 +2,7 @@
 
 **RISC-V instruction field poetry** — drag tiles onto the fridge, build an instruction or make something strange.
 
-*Status: prototype explored / not yet fully implemented*
+*Status: prototype now exists and is deployable*
 
 \---
 
